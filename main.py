@@ -6,31 +6,28 @@
 
 from datetime import time
 
-from githubdata import GithubData
-from mirutil.df_utils import save_as_prq_wo_index as sprq
 import pandas as pd
-from mirutil.df_utils import read_data_according_to_type as read_data
+from githubdata import GithubData
+from githubdata.main import _clean_github_url as cgurl
+from mirutil import utils as mu
+from mirutil.df_utils import save_as_prq_wo_index as sprq
 
 
 class RepoAddresses :
   targ = 'imahdimir/d-firm-open-duration-daily'
   stch = 'imahdimir/d-clean-d-firm-status-change'
   fip = 'imahdimir/d-firm-possible-trade-spells'
+  cur_url = cgurl('imahdimir/b-' + targ.split('/')[1])
 
 ra = RepoAddresses()
 
 class ColNames :
-  jdt = 'JDateTime'
-  jd = 'JDate'
   d = 'Date'
-  row = 'Row'
   dt = 'DateTime'
   id = 'TSETMC_ID'
   ns = 'NewStatus'
-  iso = 'iso'
   t = 'Time'
   trdble = 'Tradable'
-  dup = 'Duplicated'
   ismktopen = 'IsMarketOpen'
   sdt = 'StartDateTime'
   edt = 'EndDateTime'
@@ -215,19 +212,36 @@ def main() :
   df1.head()
 
   ##
-  sprq(df1 , 'data.prq')
+
 
   ##
   rp_targ = GithubData(ra.targ)
   rp_targ.clone()
 
   ##
+  sprq(df1 , rp_targ.data_fp)
+
+  ##
+  tokp = '/Users/mahdi/Dropbox/tok.txt'
+  tok = mu.get_tok_if_accessible(tokp)
+  ##
+  msg = 'builded by: '
+  msg += ra.cur_url
+  ##
+  rp_targ.commit_and_push(msg , user = rp_targ.user_name , token = tok)
+
+  ##
+
+  rp_stch.rmdir()
+  rp_fip.rmdir()
+  rp_targ.rmdir()
+
+  ##
+
 
   ##
 
 ##
-
-
 if __name__ == '__main__' :
   main()
   print('done')
