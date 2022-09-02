@@ -215,6 +215,13 @@ def main() :
   df1.head()
 
   ##
+  sprq(df1 , 'data.prq')
+
+  ##
+  rp_targ = GithubData(ra.targ)
+  rp_targ.clone()
+
+  ##
 
   ##
 
