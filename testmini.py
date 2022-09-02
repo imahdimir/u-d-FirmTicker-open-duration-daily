@@ -6,119 +6,35 @@
 
 import sys
 
-from datetime import date
-from datetime import datetime as dt
-from datetime import time
-
 import pandas as pd
 import pyspark.sql.functions as sfunc
-from githubdata import GithubData
-from mirutil.df_utils import read_data_according_to_type as read_data
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import concat_ws
 from pyspark.sql import Window
+from pyspark.sql.functions import concat_ws
+
+from shared import _ret_df_of_every_second_in_day
+from shared import _ret_status_change_data
+from shared import c
+from shared import market_end_time
+from shared import market_start_time
 
 
 spark = SparkSession.builder.getOrCreate()
-
-class RepoAddresses :
-  stch = 'imahdimir/d-clean-d-firm-status-change'
-  twd = 'imahdimir/d-TSE-working-days'
-  i2f = 'imahdimir/d-TSETMC_ID-2-FirmTicker'
-
-ra = RepoAddresses()
-
-class ColNames :
-  jdt = 'JDateTime'
-  jd = 'JDate'
-  d = 'Date'
-  row = 'Row'
-  dt = 'DateTime'
-  id = 'TSETMC_ID'
-  ns = 'NewStatus'
-  iso = 'iso'
-  t = 'Time'
-  trdble = 'Tradable'
-  dup = 'Duplicated'
-  ismktopen = 'IsMarketOpen'
-
-c = ColNames()
-
-class Status :
-  tradeable = True
-  not_tradeable = False
-
-s = Status()
-
-status_simplified = {
-    'مجاز'        : s.tradeable ,
-    'مجاز-محفوظ'  : s.not_tradeable ,
-    'مجاز-متوقف'  : s.not_tradeable ,
-    'ممنوع-متوقف' : s.not_tradeable ,
-    'ممنوع'       : s.not_tradeable ,
-    'ممنوع-محفوظ' : s.not_tradeable ,
-    'مجاز-مسدود'  : s.not_tradeable ,
-    'ممنوع-مسدود' : s.not_tradeable ,
-    }
-
-market_start_time = time(9 , 0 , 0)
-market_end_time = time(12 , 30 , 0)
 
 def main() :
   pass
 
   ##
-  rp_stch = GithubData(ra.stch)
-  rp_stch.clone()
+  dst = _ret_status_change_data()
   ##
-  dstp = rp_stch.data_fp
-  dst = read_data(dstp)
+  dti = _ret_df_of_every_second_in_day(market_start_time , market_end_time)
   ##
-  dst[c.trdble] = dst[c.ns].map(status_simplified)
-  ##
-  msk = dst[c.trdble].isna()
-  df1 = dst[msk]
-  assert df1.empty
-  ##
-  dst = dst[[c.id , c.dt , c.trdble]]
-  ##
-  rp_twd = GithubData(ra.twd)
-  ##
-  rp_twd.clone()
-  ##
-  dtwfp = rp_twd.data_fp
-  dtw = read_data(dtwfp)
-  dtw = dtw.reset_index()
-  dtw = dtw[[c.d]]
-  ##
-  rp_i2f = GithubData(ra.i2f)
-  ##
-  rp_i2f.clone()
-  ##
-  difp = rp_i2f.data_fp
-  did = read_data(difp)
-  did = did[[c.id]]
-  ##
-  arbt_day = date(2018 , 1 , 1)
-
-  strtdt = dt.combine(arbt_day , market_start_time)
-  enddt = dt.combine(arbt_day , market_end_time)
-  dti = pd.date_range(start = strtdt , end = enddt , freq = 's')
-
-  dti = dti.to_frame()
-  dti = dti.reset_index(drop = True)
-  dti[c.t] = dti[0].dt.time
-  dti[c.t] = dti[c.t].astype(str)
-  ##
-  dti = dti
   dtw = pd.DataFrame({
       c.d : ['2015-06-02'] ,
       })
   did = pd.DataFrame({
-      c.id : ['70289374539527245' , '56574323121551263']
+      c.id : ['70289374539527245']
       })
-  ##
-  dti[c.ismktopen] = True
   ##
   sdt = spark.createDataFrame(dti)
   sdw = spark.createDataFrame(dtw)
@@ -137,12 +53,13 @@ def main() :
   msk &= dst['1'].eq('2015-06-02')
   len(msk[msk])
   ##
-  dst = dst[msk]
-  dst = dst[[c.id , c.dt , c.trdble]]
+  dst1 = dst[msk]
+  dst1 = dst1[[c.id , c.dt , c.trdble]]
   ##
-  sds = spark.createDataFrame(dst)
+  sds = spark.createDataFrame(dst1)
   ##
-  sd = sd.join(sds , [c.id , c.dt] , how = 'outer')
+  sd1 = sd.join(sds , [c.id , c.dt] , how = 'outer')
+  sd = sd1
   ##
   sd = sd.sort([c.id , c.dt])
   ##
@@ -160,8 +77,6 @@ def main() :
   ##
   sd = sd.withColumn(c.d , sfunc.substring(c.dt , 1 , 10))
   ##
-  sdv = sd.toPandas()
-  ##
   sd = sd.groupBy([c.id , c.d]).count()
   ##
   sdv = sd.toPandas()
@@ -170,22 +85,37 @@ def main() :
   len(msk[msk])
 
   ##
+  df = pd.merge(did , dtw , how = 'cross')
+  df = pd.merge(df , dti , how = 'cross')
 
+  ##
+  df[c.dt] = df['Date'] + ' ' + df['Time']
+
+  ##
+  df = df[[c.id , c.dt , c.ismktopen]]
+
+  ##
+  msk = dst[c.id].eq('70289374539527245')
+  msk &= dst[c.dt].str[:10].eq('2015-06-02')
+  df1 = dst[msk]
+  df1 = df1[[c.dt , c.trdble]]
+
+  ##
+  df2 = pd.merge(df , df1 , how = 'outer' , on = [c.dt])
+  ##
+  df2 = df2[[c.dt , c.ismktopen , c.trdble]]
+  df2 = df2.sort_values([c.dt])
+  ##
+  df2[c.trdble] = df2[c.trdble].ffill()
+  ##
+  msk = df2[c.trdble].eq(True)
+  msk &= df2[c.ismktopen].eq(True)
+  df3 = df2[msk]
 
   ##
 
 
   ##
-
-
-  ##
-
-
-  ##
-
-
-  ##
-
 
   ##
 
