@@ -8,16 +8,15 @@ from datetime import time
 
 import pandas as pd
 from githubdata import GithubData
-from githubdata.main import _clean_github_url as cgurl
 from mirutil import utils as mu
 from mirutil.df_utils import save_as_prq_wo_index as sprq
 
 
 class RepoAddresses :
-  targ = 'imahdimir/d-firm-open-duration-daily'
-  stch = 'imahdimir/d-clean-d-firm-status-change'
-  fip = 'imahdimir/d-firm-possible-trade-spells'
-  cur_url = cgurl('imahdimir/b-' + targ.split('/')[1])
+  targ = 'https://github.com/imahdimir/d-firm-open-duration-daily'
+  stch = 'https://github.com/imahdimir/d-clean-d-firm-status-change'
+  fip = 'https://github.com/imahdimir/d-firm-possible-trade-spells'
+  cur_url = 'https://github.com/imahdimir/b-d-firm-open-duration-daily'
 
 ra = RepoAddresses()
 
